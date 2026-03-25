@@ -10,10 +10,11 @@ spring:
       connection-timeout: 30000
 
   flyway:
-    enabled: false
+    enabled: true
     schemas: NBPT4
     default-schema: NBPT4
     baseline-on-migrate: true
+    table: nbp_flyway_history
     locations: classpath:db/migration
 
 server:
