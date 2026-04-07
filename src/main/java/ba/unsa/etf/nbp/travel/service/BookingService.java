@@ -9,6 +9,7 @@ import ba.unsa.etf.nbp.travel.exception.ResourceNotFoundException;
 import ba.unsa.etf.nbp.travel.model.enums.BookingType;
 import ba.unsa.etf.nbp.travel.repository.AccommodationRepository;
 import ba.unsa.etf.nbp.travel.repository.BookingRepository;
+import ba.unsa.etf.nbp.travel.repository.PaymentRepository;
 import ba.unsa.etf.nbp.travel.repository.TransportRepository;
 import ba.unsa.etf.nbp.travel.repository.TravelPackageRepository;
 import ba.unsa.etf.nbp.travel.repository.UserRepository;
@@ -23,6 +24,7 @@ import static ba.unsa.etf.nbp.travel.mapper.BookingMapper.toResponse;
 import static ba.unsa.etf.nbp.travel.model.enums.BookingStatus.CANCELLED;
 import static ba.unsa.etf.nbp.travel.model.enums.BookingStatus.CONFIRMED;
 import static ba.unsa.etf.nbp.travel.model.enums.BookingStatus.PENDING;
+import static ba.unsa.etf.nbp.travel.model.enums.PaymentStatus.COMPLETED;
 import static ba.unsa.etf.nbp.travel.model.enums.BookingType.ACCOMMODATION;
 import static ba.unsa.etf.nbp.travel.model.enums.BookingType.TRANSPORT;
 import static ba.unsa.etf.nbp.travel.model.enums.BookingType.TRAVEL_PACKAGE;
@@ -39,6 +41,7 @@ public class BookingService {
     private final AccommodationRepository accommodationRepository;
     private final TransportRepository transportRepository;
     private final UserRepository userRepository;
+    private final PaymentRepository paymentRepository;
 
     @Transactional
     public BookingResponse create(Long userId, BookingRequest request) {
@@ -87,6 +90,12 @@ public class BookingService {
 
         if (!PENDING.name().equals(entity.getStatus())) {
             throw new BadRequestException("Booking can only be confirmed when status is PENDING");
+        }
+
+        var payment = paymentRepository.findByBookingId(id)
+                .orElseThrow(() -> new BadRequestException("Cannot confirm booking without payment"));
+        if (!COMPLETED.name().equals(payment.getStatus())) {
+            throw new BadRequestException("Cannot confirm booking with non-completed payment");
         }
 
         bookingRepository.updateStatus(id, CONFIRMED.name());

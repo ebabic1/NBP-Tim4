@@ -189,6 +189,21 @@ class BookingPaymentReviewWebMvcTest {
     }
 
     @Test
+    void payment_my_and_adminList() throws Exception {
+        var page = new PageResponse<PaymentResponse>(List.of(), 0, 10, 0, 0);
+        when(paymentService.findMyPayments(100L, 0, 10)).thenReturn(page);
+        when(paymentService.findAll(0, 10)).thenReturn(page);
+
+        mockMvc.perform(get("/api/payments/my")
+                        .header("Authorization", userAuth()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/payments")
+                        .header("Authorization", agentAuth()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void review_create_user() throws Exception {
         var req = new ReviewRequest(5, "Great");
         when(reviewService.create(eq(6L), eq(100L), any())).thenReturn(
@@ -214,6 +229,21 @@ class BookingPaymentReviewWebMvcTest {
                 new ReviewResponse(2L, 100L, "booker", 6L, 4, "ok", LocalDate.now()));
 
         mockMvc.perform(get("/api/reviews/2")
+                        .header("Authorization", userAuth()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void reviews_byPackage_and_byAccommodation() throws Exception {
+        var page = new PageResponse<ReviewResponse>(List.of(), 0, 10, 0, 0);
+        when(reviewService.findByTravelPackageId(1L, 0, 10)).thenReturn(page);
+        when(reviewService.findByAccommodationId(2L, 0, 10)).thenReturn(page);
+
+        mockMvc.perform(get("/api/travel-packages/1/reviews")
+                        .header("Authorization", userAuth()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/accommodations/2/reviews")
                         .header("Authorization", userAuth()))
                 .andExpect(status().isOk());
     }

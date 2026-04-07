@@ -50,6 +50,24 @@ public class ReviewController {
         return ResponseEntity.ok(reviewService.findById(id));
     }
 
+    @GetMapping("/travel-packages/{travelPackageId}/reviews")
+    public ResponseEntity<PageResponse<ReviewResponse>> findByTravelPackageId(
+            @PathVariable Long travelPackageId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        return ResponseEntity.ok(reviewService.findByTravelPackageId(travelPackageId, page, size));
+    }
+
+    @GetMapping("/accommodations/{accommodationId}/reviews")
+    public ResponseEntity<PageResponse<ReviewResponse>> findByAccommodationId(
+            @PathVariable Long accommodationId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        return ResponseEntity.ok(reviewService.findByAccommodationId(accommodationId, page, size));
+    }
+
     @DeleteMapping("/reviews/{id}")
     @Role({"ADMIN", "USER"})
     public ResponseEntity<Void> delete(@PathVariable Long id) {

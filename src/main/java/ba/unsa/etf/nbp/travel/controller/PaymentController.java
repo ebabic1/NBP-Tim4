@@ -1,6 +1,7 @@
 package ba.unsa.etf.nbp.travel.controller;
 
 import ba.unsa.etf.nbp.travel.dto.request.PaymentRequest;
+import ba.unsa.etf.nbp.travel.dto.response.PageResponse;
 import ba.unsa.etf.nbp.travel.dto.response.PaymentResponse;
 import ba.unsa.etf.nbp.travel.security.AuthContext;
 import ba.unsa.etf.nbp.travel.security.Role;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import static org.springframework.http.HttpStatus.CREATED;
@@ -41,5 +43,24 @@ public class PaymentController {
     @GetMapping("/bookings/{bookingId}/payment")
     public ResponseEntity<PaymentResponse> findByBookingId(@PathVariable Long bookingId) {
         return ResponseEntity.ok(paymentService.findByBookingId(bookingId));
+    }
+
+    @GetMapping("/payments/my")
+    @Role({"USER"})
+    public ResponseEntity<PageResponse<PaymentResponse>> findMyPayments(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        var userId = AuthContext.get().userId();
+        return ResponseEntity.ok(paymentService.findMyPayments(userId, page, size));
+    }
+
+    @GetMapping("/payments")
+    @Role({"ADMIN", "AGENT"})
+    public ResponseEntity<PageResponse<PaymentResponse>> findAll(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        return ResponseEntity.ok(paymentService.findAll(page, size));
     }
 }

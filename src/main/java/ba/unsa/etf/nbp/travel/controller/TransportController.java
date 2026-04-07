@@ -36,13 +36,14 @@ public class TransportController {
     public ResponseEntity<PageResponse<TransportResponse>> search(
             @RequestParam(required = false) Long destinationId,
             @RequestParam(required = false) String type,
+            @RequestParam(required = false) String provider,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        return ResponseEntity.ok(transportService.search(destinationId, type, startDate, endDate,
+        return ResponseEntity.ok(transportService.search(destinationId, type, provider, startDate, endDate,
                 minPrice, maxPrice, page, size));
     }
 

@@ -39,13 +39,14 @@ public class TravelPackageController {
     public ResponseEntity<PageResponse<TravelPackageResponse>> search(
             @RequestParam(required = false) Long destinationId,
             @RequestParam(required = false) Long cityId,
+            @RequestParam(required = false) Long countryId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        return ResponseEntity.ok(travelPackageService.search(destinationId, cityId, startDate, endDate,
+        return ResponseEntity.ok(travelPackageService.search(destinationId, cityId, countryId, startDate, endDate,
                 minPrice, maxPrice, page, size));
     }
 
