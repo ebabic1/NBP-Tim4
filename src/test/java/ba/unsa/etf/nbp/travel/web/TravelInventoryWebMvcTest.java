@@ -178,7 +178,7 @@ class TravelInventoryWebMvcTest {
     @Test
     void transports_search_returnsOk() throws Exception {
         var page = new PageResponse<TransportResponse>(List.of(), 0, 10, 0, 0);
-        when(transportService.search(null, null, null, null, null, null, 0, 10)).thenReturn(page);
+        when(transportService.search(null, null, null, null, null, null, null, 0, 10)).thenReturn(page);
 
         mockMvc.perform(get("/api/transports")
                         .header("Authorization", userAuth()))
@@ -218,7 +218,7 @@ class TravelInventoryWebMvcTest {
     @Test
     void travelPackages_search_and_detail() throws Exception {
         var listPage = new PageResponse<TravelPackageResponse>(List.of(), 0, 10, 0, 0);
-        when(travelPackageService.search(null, null, null, null, null, null, 0, 10)).thenReturn(listPage);
+        when(travelPackageService.search(null, null, null, null, null, null, null, 0, 10)).thenReturn(listPage);
 
         mockMvc.perform(get("/api/travel-packages")
                         .header("Authorization", userAuth()))

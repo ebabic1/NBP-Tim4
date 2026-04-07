@@ -78,10 +78,12 @@ public class TravelPackageRepository {
         return jdbcTemplate.query(SELECT_BY_DESTINATION_ID, Map.of("destinationId", destinationId), ROW_MAPPER);
     }
 
-    public List<TravelPackageEntity> search(Long destinationId, Long cityId, LocalDate startDate, LocalDate endDate,
+    public List<TravelPackageEntity> search(Long destinationId, Long cityId, Long countryId,
+                                            LocalDate startDate, LocalDate endDate,
                                             BigDecimal minPrice, BigDecimal maxPrice, int page, int size) {
         var params = new MapSqlParameterSource();
-        var sql = buildSearchQuery("tp.*", destinationId, cityId, startDate, endDate, minPrice, maxPrice, params);
+        var sql = buildSearchQuery("tp.*", destinationId, cityId, countryId,
+                startDate, endDate, minPrice, maxPrice, params);
         var offset = page * size;
         params.addValue("offset", offset);
         params.addValue("size", size);
@@ -89,21 +91,27 @@ public class TravelPackageRepository {
         return jdbcTemplate.query(sql, params, ROW_MAPPER);
     }
 
-    public long countSearch(Long destinationId, Long cityId, LocalDate startDate, LocalDate endDate,
+    public long countSearch(Long destinationId, Long cityId, Long countryId,
+                            LocalDate startDate, LocalDate endDate,
                             BigDecimal minPrice, BigDecimal maxPrice) {
         var params = new MapSqlParameterSource();
-        var sql = buildSearchQuery("COUNT(*)", destinationId, cityId, startDate, endDate, minPrice, maxPrice, params);
+        var sql = buildSearchQuery("COUNT(*)", destinationId, cityId, countryId,
+                startDate, endDate, minPrice, maxPrice, params);
         var result = jdbcTemplate.queryForObject(sql, params, Long.class);
         return nonNull(result) ? result : 0L;
     }
 
-    private String buildSearchQuery(String selectClause, Long destinationId, Long cityId, LocalDate startDate,
-                                    LocalDate endDate, BigDecimal minPrice, BigDecimal maxPrice,
+    private String buildSearchQuery(String selectClause, Long destinationId, Long cityId, Long countryId,
+                                    LocalDate startDate, LocalDate endDate,
+                                    BigDecimal minPrice, BigDecimal maxPrice,
                                     MapSqlParameterSource params) {
         var sql = new StringBuilder("SELECT " + selectClause + " FROM NBP_TRAVEL_PACKAGE tp");
 
-        if (nonNull(cityId)) {
+        if (nonNull(cityId) || nonNull(countryId)) {
             sql.append(" JOIN NBP_DESTINATION d ON tp.DESTINATION_ID = d.ID");
+        }
+        if (nonNull(countryId)) {
+            sql.append(" JOIN NBP_CITY c ON d.CITY_ID = c.ID");
         }
 
         sql.append(" WHERE 1=1");
@@ -115,6 +123,10 @@ public class TravelPackageRepository {
         if (nonNull(cityId)) {
             sql.append(" AND d.CITY_ID = :cityId");
             params.addValue("cityId", cityId);
+        }
+        if (nonNull(countryId)) {
+            sql.append(" AND c.COUNTRY_ID = :countryId");
+            params.addValue("countryId", countryId);
         }
         if (nonNull(startDate)) {
             sql.append(" AND tp.START_DATE >= :startDate");

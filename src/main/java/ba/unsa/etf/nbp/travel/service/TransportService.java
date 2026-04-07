@@ -38,12 +38,14 @@ public class TransportService {
         return toResponse(entity, getDestinationName(entity.getDestinationId()));
     }
 
-    public PageResponse<TransportResponse> search(Long destinationId, String type, LocalDate startDate,
-                                                   LocalDate endDate, BigDecimal minPrice, BigDecimal maxPrice,
-                                                   int page, int size) {
-        var transports = transportRepository.search(destinationId, type, startDate, endDate,
+    public PageResponse<TransportResponse> search(Long destinationId, String type, String provider,
+                                                  LocalDate startDate, LocalDate endDate,
+                                                  BigDecimal minPrice, BigDecimal maxPrice,
+                                                  int page, int size) {
+        var transports = transportRepository.search(destinationId, type, provider, startDate, endDate,
                 minPrice, maxPrice, page, size);
-        var total = transportRepository.countSearch(destinationId, type, startDate, endDate, minPrice, maxPrice);
+        var total = transportRepository.countSearch(destinationId, type, provider,
+                startDate, endDate, minPrice, maxPrice);
         var content = transports.stream()
                 .map(t -> toResponse(t, getDestinationName(t.getDestinationId())))
                 .toList();

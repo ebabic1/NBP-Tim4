@@ -7,6 +7,7 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -36,6 +37,30 @@ public class PaymentRepository {
     private static final String SELECT_BY_BOOKING_ID =
             "SELECT * FROM NBP_PAYMENT WHERE BOOKING_ID = :bookingId";
 
+    private static final String SELECT_BY_USER_ID_PAGED =
+            """
+            SELECT p.*
+            FROM NBP_PAYMENT p
+            JOIN NBP_BOOKING b ON b.ID = p.BOOKING_ID
+            WHERE b.USER_ID = :userId
+            ORDER BY p.ID
+            OFFSET :offset ROWS FETCH NEXT :size ROWS ONLY
+            """;
+
+    private static final String COUNT_BY_USER_ID =
+            """
+            SELECT COUNT(*)
+            FROM NBP_PAYMENT p
+            JOIN NBP_BOOKING b ON b.ID = p.BOOKING_ID
+            WHERE b.USER_ID = :userId
+            """;
+
+    private static final String SELECT_ALL_PAGED =
+            "SELECT * FROM NBP_PAYMENT ORDER BY ID OFFSET :offset ROWS FETCH NEXT :size ROWS ONLY";
+
+    private static final String COUNT =
+            "SELECT COUNT(*) FROM NBP_PAYMENT";
+
     private static final String SELECT_NEXT_ID =
             "SELECT NBP_PAYMENT_SEQ.NEXTVAL FROM DUAL";
 
@@ -55,6 +80,26 @@ public class PaymentRepository {
     public Optional<PaymentEntity> findByBookingId(Long bookingId) {
         var results = jdbcTemplate.query(SELECT_BY_BOOKING_ID, Map.of("bookingId", bookingId), ROW_MAPPER);
         return results.stream().findFirst();
+    }
+
+    public List<PaymentEntity> findByUserId(Long userId, int page, int size) {
+        var offset = page * size;
+        return jdbcTemplate.query(SELECT_BY_USER_ID_PAGED, Map.of("userId", userId, "offset", offset, "size", size), ROW_MAPPER);
+    }
+
+    public long countByUserId(Long userId) {
+        var result = jdbcTemplate.queryForObject(COUNT_BY_USER_ID, Map.of("userId", userId), Long.class);
+        return nonNull(result) ? result : 0L;
+    }
+
+    public List<PaymentEntity> findAll(int page, int size) {
+        var offset = page * size;
+        return jdbcTemplate.query(SELECT_ALL_PAGED, Map.of("offset", offset, "size", size), ROW_MAPPER);
+    }
+
+    public long count() {
+        var result = jdbcTemplate.queryForObject(COUNT, Map.of(), Long.class);
+        return nonNull(result) ? result : 0L;
     }
 
     public Long save(PaymentEntity e) {

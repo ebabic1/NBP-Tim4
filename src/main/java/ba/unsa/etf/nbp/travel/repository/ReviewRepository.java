@@ -37,6 +37,42 @@ public class ReviewRepository {
     private static final String SELECT_ALL_PAGED =
             "SELECT * FROM NBP_REVIEW ORDER BY ID OFFSET :offset ROWS FETCH NEXT :size ROWS ONLY";
 
+    private static final String SELECT_BY_TRAVEL_PACKAGE_ID_PAGED =
+            """
+            SELECT r.*
+            FROM NBP_REVIEW r
+            JOIN NBP_BOOKING b ON b.ID = r.BOOKING_ID
+            WHERE b.TRAVEL_PACKAGE_ID = :travelPackageId
+            ORDER BY r.ID
+            OFFSET :offset ROWS FETCH NEXT :size ROWS ONLY
+            """;
+
+    private static final String COUNT_BY_TRAVEL_PACKAGE_ID =
+            """
+            SELECT COUNT(*)
+            FROM NBP_REVIEW r
+            JOIN NBP_BOOKING b ON b.ID = r.BOOKING_ID
+            WHERE b.TRAVEL_PACKAGE_ID = :travelPackageId
+            """;
+
+    private static final String SELECT_BY_ACCOMMODATION_ID_PAGED =
+            """
+            SELECT r.*
+            FROM NBP_REVIEW r
+            JOIN NBP_BOOKING b ON b.ID = r.BOOKING_ID
+            WHERE b.ACCOMMODATION_ID = :accommodationId
+            ORDER BY r.ID
+            OFFSET :offset ROWS FETCH NEXT :size ROWS ONLY
+            """;
+
+    private static final String COUNT_BY_ACCOMMODATION_ID =
+            """
+            SELECT COUNT(*)
+            FROM NBP_REVIEW r
+            JOIN NBP_BOOKING b ON b.ID = r.BOOKING_ID
+            WHERE b.ACCOMMODATION_ID = :accommodationId
+            """;
+
     private static final String SELECT_NEXT_ID =
             "SELECT NBP_REVIEW_SEQ.NEXTVAL FROM DUAL";
 
@@ -86,6 +122,30 @@ public class ReviewRepository {
     public List<ReviewEntity> findAll(int page, int size) {
         var offset = page * size;
         return jdbcTemplate.query(SELECT_ALL_PAGED, Map.of("offset", offset, "size", size), ROW_MAPPER);
+    }
+
+    public List<ReviewEntity> findByTravelPackageId(Long travelPackageId, int page, int size) {
+        var offset = page * size;
+        return jdbcTemplate.query(SELECT_BY_TRAVEL_PACKAGE_ID_PAGED,
+                Map.of("travelPackageId", travelPackageId, "offset", offset, "size", size),
+                ROW_MAPPER);
+    }
+
+    public long countByTravelPackageId(Long travelPackageId) {
+        var result = jdbcTemplate.queryForObject(COUNT_BY_TRAVEL_PACKAGE_ID, Map.of("travelPackageId", travelPackageId), Long.class);
+        return nonNull(result) ? result : 0L;
+    }
+
+    public List<ReviewEntity> findByAccommodationId(Long accommodationId, int page, int size) {
+        var offset = page * size;
+        return jdbcTemplate.query(SELECT_BY_ACCOMMODATION_ID_PAGED,
+                Map.of("accommodationId", accommodationId, "offset", offset, "size", size),
+                ROW_MAPPER);
+    }
+
+    public long countByAccommodationId(Long accommodationId) {
+        var result = jdbcTemplate.queryForObject(COUNT_BY_ACCOMMODATION_ID, Map.of("accommodationId", accommodationId), Long.class);
+        return nonNull(result) ? result : 0L;
     }
 
     public long count() {

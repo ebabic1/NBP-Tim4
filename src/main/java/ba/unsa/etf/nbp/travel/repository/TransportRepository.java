@@ -79,10 +79,11 @@ public class TransportRepository {
         return jdbcTemplate.query(SELECT_BY_DESTINATION_ID, Map.of("destinationId", destinationId), ROW_MAPPER);
     }
 
-    public List<TransportEntity> search(Long destinationId, String type, LocalDate startDate, LocalDate endDate,
+    public List<TransportEntity> search(Long destinationId, String type, String provider,
+                                        LocalDate startDate, LocalDate endDate,
                                         BigDecimal minPrice, BigDecimal maxPrice, int page, int size) {
         var params = new MapSqlParameterSource();
-        var sql = buildSearchQuery("*", destinationId, type, startDate, endDate, minPrice, maxPrice, params);
+        var sql = buildSearchQuery("*", destinationId, type, provider, startDate, endDate, minPrice, maxPrice, params);
         var offset = page * size;
         params.addValue("offset", offset);
         params.addValue("size", size);
@@ -90,16 +91,18 @@ public class TransportRepository {
         return jdbcTemplate.query(sql, params, ROW_MAPPER);
     }
 
-    public long countSearch(Long destinationId, String type, LocalDate startDate, LocalDate endDate,
+    public long countSearch(Long destinationId, String type, String provider,
+                            LocalDate startDate, LocalDate endDate,
                             BigDecimal minPrice, BigDecimal maxPrice) {
         var params = new MapSqlParameterSource();
-        var sql = buildSearchQuery("COUNT(*)", destinationId, type, startDate, endDate, minPrice, maxPrice, params);
+        var sql = buildSearchQuery("COUNT(*)", destinationId, type, provider, startDate, endDate, minPrice, maxPrice, params);
         var result = jdbcTemplate.queryForObject(sql, params, Long.class);
         return nonNull(result) ? result : 0L;
     }
 
-    private String buildSearchQuery(String selectClause, Long destinationId, String type, LocalDate startDate,
-                                    LocalDate endDate, BigDecimal minPrice, BigDecimal maxPrice,
+    private String buildSearchQuery(String selectClause, Long destinationId, String type, String provider,
+                                    LocalDate startDate, LocalDate endDate,
+                                    BigDecimal minPrice, BigDecimal maxPrice,
                                     MapSqlParameterSource params) {
         var sql = new StringBuilder("SELECT " + selectClause + " FROM NBP_TRANSPORT WHERE 1=1");
 
@@ -110,6 +113,10 @@ public class TransportRepository {
         if (nonNull(type)) {
             sql.append(" AND TYPE = :type");
             params.addValue("type", type);
+        }
+        if (nonNull(provider) && !provider.isBlank()) {
+            sql.append(" AND UPPER(PROVIDER) LIKE '%' || UPPER(:provider) || '%'");
+            params.addValue("provider", provider.trim());
         }
         if (nonNull(startDate)) {
             sql.append(" AND DEPARTURE_DATE >= :startDate");

@@ -69,6 +69,24 @@ public class ReviewService {
         return buildPageResponse(content, page, size, total);
     }
 
+    public PageResponse<ReviewResponse> findByTravelPackageId(Long travelPackageId, int page, int size) {
+        var reviews = reviewRepository.findByTravelPackageId(travelPackageId, page, size);
+        var total = reviewRepository.countByTravelPackageId(travelPackageId);
+        var content = reviews.stream()
+                .map(r -> toResponse(r, getUsername(r.getUserId())))
+                .toList();
+        return buildPageResponse(content, page, size, total);
+    }
+
+    public PageResponse<ReviewResponse> findByAccommodationId(Long accommodationId, int page, int size) {
+        var reviews = reviewRepository.findByAccommodationId(accommodationId, page, size);
+        var total = reviewRepository.countByAccommodationId(accommodationId);
+        var content = reviews.stream()
+                .map(r -> toResponse(r, getUsername(r.getUserId())))
+                .toList();
+        return buildPageResponse(content, page, size, total);
+    }
+
     public ReviewResponse findById(Long id) {
         var entity = reviewRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Review", id));

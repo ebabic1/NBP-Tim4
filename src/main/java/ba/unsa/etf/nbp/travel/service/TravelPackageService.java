@@ -63,12 +63,14 @@ public class TravelPackageService {
         return toDetailResponse(entity, getDestinationName(entity.getDestinationId()), transports, accommodations);
     }
 
-    public PageResponse<TravelPackageResponse> search(Long destinationId, Long cityId, LocalDate startDate,
-                                                       LocalDate endDate, BigDecimal minPrice, BigDecimal maxPrice,
-                                                       int page, int size) {
-        var packages = travelPackageRepository.search(destinationId, cityId, startDate, endDate,
+    public PageResponse<TravelPackageResponse> search(Long destinationId, Long cityId, Long countryId,
+                                                      LocalDate startDate, LocalDate endDate,
+                                                      BigDecimal minPrice, BigDecimal maxPrice,
+                                                      int page, int size) {
+        var packages = travelPackageRepository.search(destinationId, cityId, countryId, startDate, endDate,
                 minPrice, maxPrice, page, size);
-        var total = travelPackageRepository.countSearch(destinationId, cityId, startDate, endDate, minPrice, maxPrice);
+        var total = travelPackageRepository.countSearch(destinationId, cityId, countryId,
+                startDate, endDate, minPrice, maxPrice);
         var content = packages.stream()
                 .map(p -> toResponse(p, getDestinationName(p.getDestinationId())))
                 .toList();
