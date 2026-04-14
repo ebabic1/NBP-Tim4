@@ -96,16 +96,29 @@ public class PaymentService {
         return toResponse(payment);
     }
 
-    public PaymentResponse findById(Long id) {
+    public PaymentResponse findById(Long id, Long currentUserId, String currentRole) {
         var entity = paymentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment", id));
+        checkOwnership(entity.getBookingId(), currentUserId, currentRole);
         return toResponse(entity);
     }
 
-    public PaymentResponse findByBookingId(Long bookingId) {
+    public PaymentResponse findByBookingId(Long bookingId, Long currentUserId, String currentRole) {
         var entity = paymentRepository.findByBookingId(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment for booking", bookingId));
+        checkOwnership(bookingId, currentUserId, currentRole);
         return toResponse(entity);
+    }
+
+    private void checkOwnership(Long bookingId, Long currentUserId, String currentRole) {
+        if ("ADMIN".equals(currentRole) || "AGENT".equals(currentRole)) {
+            return;
+        }
+        var booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking", bookingId));
+        if (!booking.getUserId().equals(currentUserId)) {
+            throw new ForbiddenException("You can only view your own payments");
+        }
     }
 
     public PageResponse<PaymentResponse> findMyPayments(Long userId, int page, int size) {

@@ -37,12 +37,14 @@ public class PaymentController {
 
     @GetMapping("/payments/{id}")
     public ResponseEntity<PaymentResponse> findById(@PathVariable Long id) {
-        return ResponseEntity.ok(paymentService.findById(id));
+        var user = AuthContext.get();
+        return ResponseEntity.ok(paymentService.findById(id, user.userId(), user.role()));
     }
 
     @GetMapping("/bookings/{bookingId}/payment")
     public ResponseEntity<PaymentResponse> findByBookingId(@PathVariable Long bookingId) {
-        return ResponseEntity.ok(paymentService.findByBookingId(bookingId));
+        var user = AuthContext.get();
+        return ResponseEntity.ok(paymentService.findByBookingId(bookingId, user.userId(), user.role()));
     }
 
     @GetMapping("/payments/my")
