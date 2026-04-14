@@ -21,8 +21,18 @@ public class AccommodationRepository {
 
     private final DataSource dataSource;
 
+    public record AccommodationWithName(AccommodationEntity entity, String destinationName) {}
+
     private static final String SELECT_ALL_PAGED =
             "SELECT * FROM NBP_ACCOMMODATION ORDER BY ID OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
+
+    // JOIN variant — fetches destination name in the same query (eliminates N+1 on list endpoints)
+    private static final String SELECT_ALL_WITH_NAME_PAGED = """
+            SELECT a.*, d.NAME as DESTINATION_NAME
+            FROM NBP_ACCOMMODATION a
+            JOIN NBP_DESTINATION d ON a.DESTINATION_ID = d.ID
+            ORDER BY a.ID OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
+            """;
 
     private static final String SELECT_BY_ID =
             "SELECT * FROM NBP_ACCOMMODATION WHERE ID = ?";
@@ -79,6 +89,26 @@ public class AccommodationRepository {
                 var results = new ArrayList<AccommodationEntity>();
                 while (rs.next()) {
                     results.add(mapRow(rs));
+                }
+                return results;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
+    }
+
+    public List<AccommodationWithName> findAllWithName(int page, int size) {
+        var offset = page * size;
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try (var ps = conn.prepareStatement(SELECT_ALL_WITH_NAME_PAGED)) {
+            ps.setInt(1, offset);
+            ps.setInt(2, size);
+            try (var rs = ps.executeQuery()) {
+                var results = new ArrayList<AccommodationWithName>();
+                while (rs.next()) {
+                    results.add(new AccommodationWithName(mapRow(rs), rs.getString("DESTINATION_NAME")));
                 }
                 return results;
             }

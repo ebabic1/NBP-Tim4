@@ -9,7 +9,8 @@ import java.util.List;
 public class PaginationUtil {
 
     public static <T> PageResponse<T> buildPageResponse(List<T> content, int page, int size, long totalElements) {
-        var totalPages = (int) Math.ceil((double) totalElements / size);
-        return new PageResponse<>(content, page, size, totalElements, totalPages);
+        var safeSize = Math.clamp(size, 1, 100);
+        var totalPages = (int) Math.ceil((double) totalElements / safeSize);
+        return new PageResponse<>(content, page, safeSize, totalElements, totalPages);
     }
 }

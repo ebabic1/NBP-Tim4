@@ -22,6 +22,7 @@ import ba.unsa.etf.nbp.travel.repository.TransportRepository;
 import ba.unsa.etf.nbp.travel.repository.TravelPackageRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -110,6 +111,7 @@ public class TravelPackageService {
         return toResponse(existing, getDestinationName(existing.getDestinationId()));
     }
 
+    @Transactional
     public void delete(Long id) {
         travelPackageRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("TravelPackage", id));

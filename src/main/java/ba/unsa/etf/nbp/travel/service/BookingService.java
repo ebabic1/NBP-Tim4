@@ -5,6 +5,7 @@ import ba.unsa.etf.nbp.travel.dto.response.BookingResponse;
 import ba.unsa.etf.nbp.travel.dto.response.PageResponse;
 import ba.unsa.etf.nbp.travel.exception.BadRequestException;
 import ba.unsa.etf.nbp.travel.exception.ConflictException;
+import ba.unsa.etf.nbp.travel.exception.ForbiddenException;
 import ba.unsa.etf.nbp.travel.exception.ResourceNotFoundException;
 import ba.unsa.etf.nbp.travel.model.enums.BookingType;
 import ba.unsa.etf.nbp.travel.repository.AccommodationRepository;
@@ -108,6 +109,10 @@ public class BookingService {
     public BookingResponse cancel(Long id, Long currentUserId) {
         var entity = bookingRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking", id));
+
+        if (!entity.getUserId().equals(currentUserId)) {
+            throw new ForbiddenException("You can only cancel your own bookings");
+        }
 
         if (CANCELLED.name().equals(entity.getStatus())) {
             throw new BadRequestException("Booking is already cancelled");

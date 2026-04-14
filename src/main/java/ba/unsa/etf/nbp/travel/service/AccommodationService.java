@@ -23,10 +23,10 @@ public class AccommodationService {
     private final DestinationRepository destinationRepository;
 
     public PageResponse<AccommodationResponse> findAll(int page, int size) {
-        var accommodations = accommodationRepository.findAll(page, size);
+        var accommodations = accommodationRepository.findAllWithName(page, size);
         var total = accommodationRepository.count();
         var content = accommodations.stream()
-                .map(a -> toResponse(a, getDestinationName(a.getDestinationId())))
+                .map(a -> toResponse(a.entity(), a.destinationName()))
                 .toList();
         return buildPageResponse(content, page, size, total);
     }
