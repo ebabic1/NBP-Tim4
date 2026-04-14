@@ -2,15 +2,17 @@ package ba.unsa.etf.nbp.travel.repository;
 
 import ba.unsa.etf.nbp.travel.model.entity.TravelPackageEntity;
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.RowMapper;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Repository;
 
+import javax.sql.DataSource;
 import java.math.BigDecimal;
+import java.sql.Date;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import static java.util.Objects.nonNull;
@@ -19,27 +21,16 @@ import static java.util.Objects.nonNull;
 @RequiredArgsConstructor
 public class TravelPackageRepository {
 
-    private final NamedParameterJdbcTemplate jdbcTemplate;
-
-    private static final RowMapper<TravelPackageEntity> ROW_MAPPER = (rs, rowNum) -> TravelPackageEntity.builder()
-            .id(rs.getLong("ID"))
-            .name(rs.getString("NAME"))
-            .description(rs.getString("DESCRIPTION"))
-            .basePrice(rs.getBigDecimal("BASE_PRICE"))
-            .maxCapacity(rs.getInt("MAX_CAPACITY"))
-            .startDate(nonNull(rs.getDate("START_DATE")) ? rs.getDate("START_DATE").toLocalDate() : null)
-            .endDate(nonNull(rs.getDate("END_DATE")) ? rs.getDate("END_DATE").toLocalDate() : null)
-            .destinationId(rs.getLong("DESTINATION_ID"))
-            .build();
+    private final DataSource dataSource;
 
     private static final String SELECT_ALL_PAGED =
-            "SELECT * FROM NBP_TRAVEL_PACKAGE ORDER BY ID OFFSET :offset ROWS FETCH NEXT :size ROWS ONLY";
+            "SELECT * FROM NBP_TRAVEL_PACKAGE ORDER BY ID OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
 
     private static final String SELECT_BY_ID =
-            "SELECT * FROM NBP_TRAVEL_PACKAGE WHERE ID = :id";
+            "SELECT * FROM NBP_TRAVEL_PACKAGE WHERE ID = ?";
 
     private static final String SELECT_BY_DESTINATION_ID =
-            "SELECT * FROM NBP_TRAVEL_PACKAGE WHERE DESTINATION_ID = :destinationId ORDER BY ID";
+            "SELECT * FROM NBP_TRAVEL_PACKAGE WHERE DESTINATION_ID = ? ORDER BY ID";
 
     private static final String SELECT_NEXT_ID =
             "SELECT NBP_TRAVEL_PACKAGE_SEQ.NEXTVAL FROM DUAL";
@@ -47,64 +38,151 @@ public class TravelPackageRepository {
     private static final String INSERT =
             """
             INSERT INTO NBP_TRAVEL_PACKAGE (ID, NAME, DESCRIPTION, BASE_PRICE, MAX_CAPACITY, START_DATE, END_DATE, DESTINATION_ID)
-            VALUES (:id, :name, :description, :basePrice, :maxCapacity, :startDate, :endDate, :destinationId)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """;
 
     private static final String UPDATE =
             """
             UPDATE NBP_TRAVEL_PACKAGE
-            SET NAME = :name, DESCRIPTION = :description, BASE_PRICE = :basePrice, MAX_CAPACITY = :maxCapacity,
-                START_DATE = :startDate, END_DATE = :endDate, DESTINATION_ID = :destinationId
-            WHERE ID = :id
+            SET NAME = ?, DESCRIPTION = ?, BASE_PRICE = ?, MAX_CAPACITY = ?,
+                START_DATE = ?, END_DATE = ?, DESTINATION_ID = ?
+            WHERE ID = ?
             """;
 
     private static final String DELETE_BY_ID =
-            "DELETE FROM NBP_TRAVEL_PACKAGE WHERE ID = :id";
+            "DELETE FROM NBP_TRAVEL_PACKAGE WHERE ID = ?";
 
     private static final String COUNT =
             "SELECT COUNT(*) FROM NBP_TRAVEL_PACKAGE";
 
+    private TravelPackageEntity mapRow(ResultSet rs) throws SQLException {
+        return TravelPackageEntity.builder()
+                .id(rs.getLong("ID"))
+                .name(rs.getString("NAME"))
+                .description(rs.getString("DESCRIPTION"))
+                .basePrice(rs.getBigDecimal("BASE_PRICE"))
+                .maxCapacity(rs.getInt("MAX_CAPACITY"))
+                .startDate(nonNull(rs.getDate("START_DATE")) ? rs.getDate("START_DATE").toLocalDate() : null)
+                .endDate(nonNull(rs.getDate("END_DATE")) ? rs.getDate("END_DATE").toLocalDate() : null)
+                .destinationId(rs.getLong("DESTINATION_ID"))
+                .build();
+    }
+
     public List<TravelPackageEntity> findAll(int page, int size) {
         var offset = page * size;
-        return jdbcTemplate.query(SELECT_ALL_PAGED, Map.of("offset", offset, "size", size), ROW_MAPPER);
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try (var ps = conn.prepareStatement(SELECT_ALL_PAGED)) {
+            ps.setInt(1, offset);
+            ps.setInt(2, size);
+            try (var rs = ps.executeQuery()) {
+                var results = new ArrayList<TravelPackageEntity>();
+                while (rs.next()) {
+                    results.add(mapRow(rs));
+                }
+                return results;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
     }
 
     public Optional<TravelPackageEntity> findById(Long id) {
-        var results = jdbcTemplate.query(SELECT_BY_ID, Map.of("id", id), ROW_MAPPER);
-        return results.stream().findFirst();
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try (var ps = conn.prepareStatement(SELECT_BY_ID)) {
+            ps.setLong(1, id);
+            try (var rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapRow(rs));
+                }
+                return Optional.empty();
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
     }
 
     public List<TravelPackageEntity> findByDestinationId(Long destinationId) {
-        return jdbcTemplate.query(SELECT_BY_DESTINATION_ID, Map.of("destinationId", destinationId), ROW_MAPPER);
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try (var ps = conn.prepareStatement(SELECT_BY_DESTINATION_ID)) {
+            ps.setLong(1, destinationId);
+            try (var rs = ps.executeQuery()) {
+                var results = new ArrayList<TravelPackageEntity>();
+                while (rs.next()) {
+                    results.add(mapRow(rs));
+                }
+                return results;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
     }
 
     public List<TravelPackageEntity> search(Long destinationId, Long cityId, Long countryId,
                                             LocalDate startDate, LocalDate endDate,
                                             BigDecimal minPrice, BigDecimal maxPrice, int page, int size) {
-        var params = new MapSqlParameterSource();
+        var params = new ArrayList<>();
         var sql = buildSearchQuery("tp.*", destinationId, cityId, countryId,
                 startDate, endDate, minPrice, maxPrice, params);
+
         var offset = page * size;
-        params.addValue("offset", offset);
-        params.addValue("size", size);
-        sql += " ORDER BY tp.ID OFFSET :offset ROWS FETCH NEXT :size ROWS ONLY";
-        return jdbcTemplate.query(sql, params, ROW_MAPPER);
+        sql += " ORDER BY tp.ID OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
+        params.add(offset);
+        params.add(size);
+
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try (var ps = conn.prepareStatement(sql)) {
+            for (var i = 0; i < params.size(); i++) {
+                ps.setObject(i + 1, params.get(i));
+            }
+            try (var rs = ps.executeQuery()) {
+                var results = new ArrayList<TravelPackageEntity>();
+                while (rs.next()) {
+                    results.add(mapRow(rs));
+                }
+                return results;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
     }
 
     public long countSearch(Long destinationId, Long cityId, Long countryId,
                             LocalDate startDate, LocalDate endDate,
                             BigDecimal minPrice, BigDecimal maxPrice) {
-        var params = new MapSqlParameterSource();
+        var params = new ArrayList<>();
         var sql = buildSearchQuery("COUNT(*)", destinationId, cityId, countryId,
                 startDate, endDate, minPrice, maxPrice, params);
-        var result = jdbcTemplate.queryForObject(sql, params, Long.class);
-        return nonNull(result) ? result : 0L;
+
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try (var ps = conn.prepareStatement(sql)) {
+            for (var i = 0; i < params.size(); i++) {
+                ps.setObject(i + 1, params.get(i));
+            }
+            try (var rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getLong(1);
+                }
+                return 0L;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
     }
 
     private String buildSearchQuery(String selectClause, Long destinationId, Long cityId, Long countryId,
                                     LocalDate startDate, LocalDate endDate,
                                     BigDecimal minPrice, BigDecimal maxPrice,
-                                    MapSqlParameterSource params) {
+                                    List<Object> params) {
         var sql = new StringBuilder("SELECT " + selectClause + " FROM NBP_TRAVEL_PACKAGE tp");
 
         if (nonNull(cityId) || nonNull(countryId)) {
@@ -117,74 +195,110 @@ public class TravelPackageRepository {
         sql.append(" WHERE 1=1");
 
         if (nonNull(destinationId)) {
-            sql.append(" AND tp.DESTINATION_ID = :destinationId");
-            params.addValue("destinationId", destinationId);
+            sql.append(" AND tp.DESTINATION_ID = ?");
+            params.add(destinationId);
         }
         if (nonNull(cityId)) {
-            sql.append(" AND d.CITY_ID = :cityId");
-            params.addValue("cityId", cityId);
+            sql.append(" AND d.CITY_ID = ?");
+            params.add(cityId);
         }
         if (nonNull(countryId)) {
-            sql.append(" AND c.COUNTRY_ID = :countryId");
-            params.addValue("countryId", countryId);
+            sql.append(" AND c.COUNTRY_ID = ?");
+            params.add(countryId);
         }
         if (nonNull(startDate)) {
-            sql.append(" AND tp.START_DATE >= :startDate");
-            params.addValue("startDate", startDate);
+            sql.append(" AND tp.START_DATE >= ?");
+            params.add(Date.valueOf(startDate));
         }
         if (nonNull(endDate)) {
-            sql.append(" AND tp.END_DATE <= :endDate");
-            params.addValue("endDate", endDate);
+            sql.append(" AND tp.END_DATE <= ?");
+            params.add(Date.valueOf(endDate));
         }
         if (nonNull(minPrice)) {
-            sql.append(" AND tp.BASE_PRICE >= :minPrice");
-            params.addValue("minPrice", minPrice);
+            sql.append(" AND tp.BASE_PRICE >= ?");
+            params.add(minPrice);
         }
         if (nonNull(maxPrice)) {
-            sql.append(" AND tp.BASE_PRICE <= :maxPrice");
-            params.addValue("maxPrice", maxPrice);
+            sql.append(" AND tp.BASE_PRICE <= ?");
+            params.add(maxPrice);
         }
 
         return sql.toString();
     }
 
     public Long save(TravelPackageEntity entity) {
-        var id = jdbcTemplate.queryForObject(SELECT_NEXT_ID, Map.of(), Long.class);
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try (var seqPs = conn.prepareStatement(SELECT_NEXT_ID);
+             var seqRs = seqPs.executeQuery()) {
 
-        var params = new MapSqlParameterSource()
-                .addValue("id", id)
-                .addValue("name", entity.getName())
-                .addValue("description", entity.getDescription())
-                .addValue("basePrice", entity.getBasePrice())
-                .addValue("maxCapacity", entity.getMaxCapacity())
-                .addValue("startDate", entity.getStartDate())
-                .addValue("endDate", entity.getEndDate())
-                .addValue("destinationId", entity.getDestinationId());
+            if (!seqRs.next()) {
+                throw new RuntimeException("Failed to get next sequence value");
+            }
+            var id = seqRs.getLong(1);
 
-        jdbcTemplate.update(INSERT, params);
-        return id;
+            try (var ps = conn.prepareStatement(INSERT)) {
+                ps.setLong(1, id);
+                ps.setString(2, entity.getName());
+                ps.setString(3, entity.getDescription());
+                ps.setBigDecimal(4, entity.getBasePrice());
+                ps.setInt(5, entity.getMaxCapacity());
+                ps.setObject(6, nonNull(entity.getStartDate()) ? Date.valueOf(entity.getStartDate()) : null);
+                ps.setObject(7, nonNull(entity.getEndDate()) ? Date.valueOf(entity.getEndDate()) : null);
+                ps.setLong(8, entity.getDestinationId());
+                ps.executeUpdate();
+            }
+
+            return id;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
     }
 
     public void update(TravelPackageEntity entity) {
-        var params = new MapSqlParameterSource()
-                .addValue("id", entity.getId())
-                .addValue("name", entity.getName())
-                .addValue("description", entity.getDescription())
-                .addValue("basePrice", entity.getBasePrice())
-                .addValue("maxCapacity", entity.getMaxCapacity())
-                .addValue("startDate", entity.getStartDate())
-                .addValue("endDate", entity.getEndDate())
-                .addValue("destinationId", entity.getDestinationId());
-
-        jdbcTemplate.update(UPDATE, params);
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try (var ps = conn.prepareStatement(UPDATE)) {
+            ps.setString(1, entity.getName());
+            ps.setString(2, entity.getDescription());
+            ps.setBigDecimal(3, entity.getBasePrice());
+            ps.setInt(4, entity.getMaxCapacity());
+            ps.setObject(5, nonNull(entity.getStartDate()) ? Date.valueOf(entity.getStartDate()) : null);
+            ps.setObject(6, nonNull(entity.getEndDate()) ? Date.valueOf(entity.getEndDate()) : null);
+            ps.setLong(7, entity.getDestinationId());
+            ps.setLong(8, entity.getId());
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
     }
 
     public void deleteById(Long id) {
-        jdbcTemplate.update(DELETE_BY_ID, Map.of("id", id));
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try (var ps = conn.prepareStatement(DELETE_BY_ID)) {
+            ps.setLong(1, id);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
     }
 
     public long count() {
-        var result = jdbcTemplate.queryForObject(COUNT, Map.of(), Long.class);
-        return nonNull(result) ? result : 0L;
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try (var ps = conn.prepareStatement(COUNT);
+             var rs = ps.executeQuery()) {
+            if (rs.next()) {
+                return rs.getLong(1);
+            }
+            return 0L;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
     }
 }

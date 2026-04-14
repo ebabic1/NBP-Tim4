@@ -2,49 +2,37 @@ package ba.unsa.etf.nbp.travel.repository;
 
 import ba.unsa.etf.nbp.travel.model.entity.PaymentEntity;
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.RowMapper;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Repository;
 
+import javax.sql.DataSource;
+import java.sql.Date;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-
-import static java.util.Objects.nonNull;
 
 @Repository
 @RequiredArgsConstructor
 public class PaymentRepository {
 
-    private final NamedParameterJdbcTemplate jdbcTemplate;
-
-    private static final RowMapper<PaymentEntity> ROW_MAPPER = (rs, rowNum) -> PaymentEntity.builder()
-            .id(rs.getLong("ID"))
-            .bookingId(rs.getLong("BOOKING_ID"))
-            .discountId(rs.getObject("DISCOUNT_ID") != null ? rs.getLong("DISCOUNT_ID") : null)
-            .amount(rs.getBigDecimal("AMOUNT"))
-            .discountAmount(rs.getBigDecimal("DISCOUNT_AMOUNT"))
-            .finalAmount(rs.getBigDecimal("FINAL_AMOUNT"))
-            .paymentDate(nonNull(rs.getDate("PAYMENT_DATE")) ? rs.getDate("PAYMENT_DATE").toLocalDate() : null)
-            .method(rs.getString("METHOD"))
-            .status(rs.getString("STATUS"))
-            .build();
+    private final DataSource dataSource;
 
     private static final String SELECT_BY_ID =
-            "SELECT * FROM NBP_PAYMENT WHERE ID = :id";
+            "SELECT * FROM NBP_PAYMENT WHERE ID = ?";
 
     private static final String SELECT_BY_BOOKING_ID =
-            "SELECT * FROM NBP_PAYMENT WHERE BOOKING_ID = :bookingId";
+            "SELECT * FROM NBP_PAYMENT WHERE BOOKING_ID = ?";
 
     private static final String SELECT_BY_USER_ID_PAGED =
             """
             SELECT p.*
             FROM NBP_PAYMENT p
             JOIN NBP_BOOKING b ON b.ID = p.BOOKING_ID
-            WHERE b.USER_ID = :userId
+            WHERE b.USER_ID = ?
             ORDER BY p.ID
-            OFFSET :offset ROWS FETCH NEXT :size ROWS ONLY
+            OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
             """;
 
     private static final String COUNT_BY_USER_ID =
@@ -52,11 +40,11 @@ public class PaymentRepository {
             SELECT COUNT(*)
             FROM NBP_PAYMENT p
             JOIN NBP_BOOKING b ON b.ID = p.BOOKING_ID
-            WHERE b.USER_ID = :userId
+            WHERE b.USER_ID = ?
             """;
 
     private static final String SELECT_ALL_PAGED =
-            "SELECT * FROM NBP_PAYMENT ORDER BY ID OFFSET :offset ROWS FETCH NEXT :size ROWS ONLY";
+            "SELECT * FROM NBP_PAYMENT ORDER BY ID OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
 
     private static final String COUNT =
             "SELECT COUNT(*) FROM NBP_PAYMENT";
@@ -68,55 +56,159 @@ public class PaymentRepository {
             """
             INSERT INTO NBP_PAYMENT (ID, BOOKING_ID, DISCOUNT_ID, AMOUNT, DISCOUNT_AMOUNT, FINAL_AMOUNT,
                 PAYMENT_DATE, METHOD, STATUS)
-            VALUES (:id, :bookingId, :discountId, :amount, :discountAmount, :finalAmount,
-                :paymentDate, :method, :status)
+            VALUES (?, ?, ?, ?, ?, ?,
+                ?, ?, ?)
             """;
 
+    private PaymentEntity mapRow(ResultSet rs) throws SQLException {
+        return PaymentEntity.builder()
+                .id(rs.getLong("ID"))
+                .bookingId(rs.getLong("BOOKING_ID"))
+                .discountId(rs.getObject("DISCOUNT_ID") != null ? rs.getLong("DISCOUNT_ID") : null)
+                .amount(rs.getBigDecimal("AMOUNT"))
+                .discountAmount(rs.getBigDecimal("DISCOUNT_AMOUNT"))
+                .finalAmount(rs.getBigDecimal("FINAL_AMOUNT"))
+                .paymentDate(rs.getObject("PAYMENT_DATE") != null ? rs.getDate("PAYMENT_DATE").toLocalDate() : null)
+                .method(rs.getString("METHOD"))
+                .status(rs.getString("STATUS"))
+                .build();
+    }
+
     public Optional<PaymentEntity> findById(Long id) {
-        var results = jdbcTemplate.query(SELECT_BY_ID, Map.of("id", id), ROW_MAPPER);
-        return results.stream().findFirst();
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try (var ps = conn.prepareStatement(SELECT_BY_ID)) {
+            ps.setLong(1, id);
+            try (var rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapRow(rs));
+                }
+                return Optional.empty();
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
     }
 
     public Optional<PaymentEntity> findByBookingId(Long bookingId) {
-        var results = jdbcTemplate.query(SELECT_BY_BOOKING_ID, Map.of("bookingId", bookingId), ROW_MAPPER);
-        return results.stream().findFirst();
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try (var ps = conn.prepareStatement(SELECT_BY_BOOKING_ID)) {
+            ps.setLong(1, bookingId);
+            try (var rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapRow(rs));
+                }
+                return Optional.empty();
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
     }
 
     public List<PaymentEntity> findByUserId(Long userId, int page, int size) {
         var offset = page * size;
-        return jdbcTemplate.query(SELECT_BY_USER_ID_PAGED, Map.of("userId", userId, "offset", offset, "size", size), ROW_MAPPER);
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try (var ps = conn.prepareStatement(SELECT_BY_USER_ID_PAGED)) {
+            ps.setLong(1, userId);
+            ps.setInt(2, offset);
+            ps.setInt(3, size);
+            try (var rs = ps.executeQuery()) {
+                var list = new ArrayList<PaymentEntity>();
+                while (rs.next()) {
+                    list.add(mapRow(rs));
+                }
+                return list;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
     }
 
     public long countByUserId(Long userId) {
-        var result = jdbcTemplate.queryForObject(COUNT_BY_USER_ID, Map.of("userId", userId), Long.class);
-        return nonNull(result) ? result : 0L;
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try (var ps = conn.prepareStatement(COUNT_BY_USER_ID)) {
+            ps.setLong(1, userId);
+            try (var rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getLong(1);
+                }
+                return 0L;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
     }
 
     public List<PaymentEntity> findAll(int page, int size) {
         var offset = page * size;
-        return jdbcTemplate.query(SELECT_ALL_PAGED, Map.of("offset", offset, "size", size), ROW_MAPPER);
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try (var ps = conn.prepareStatement(SELECT_ALL_PAGED)) {
+            ps.setInt(1, offset);
+            ps.setInt(2, size);
+            try (var rs = ps.executeQuery()) {
+                var list = new ArrayList<PaymentEntity>();
+                while (rs.next()) {
+                    list.add(mapRow(rs));
+                }
+                return list;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
     }
 
     public long count() {
-        var result = jdbcTemplate.queryForObject(COUNT, Map.of(), Long.class);
-        return nonNull(result) ? result : 0L;
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try (var ps = conn.prepareStatement(COUNT);
+             var rs = ps.executeQuery()) {
+            if (rs.next()) {
+                return rs.getLong(1);
+            }
+            return 0L;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
     }
 
     public Long save(PaymentEntity e) {
-        var id = jdbcTemplate.queryForObject(SELECT_NEXT_ID, Map.of(), Long.class);
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try {
+            Long id;
+            try (var ps = conn.prepareStatement(SELECT_NEXT_ID);
+                 var rs = ps.executeQuery()) {
+                rs.next();
+                id = rs.getLong(1);
+            }
 
-        var params = new MapSqlParameterSource()
-                .addValue("id", id)
-                .addValue("bookingId", e.getBookingId())
-                .addValue("discountId", e.getDiscountId())
-                .addValue("amount", e.getAmount())
-                .addValue("discountAmount", e.getDiscountAmount())
-                .addValue("finalAmount", e.getFinalAmount())
-                .addValue("paymentDate", e.getPaymentDate())
-                .addValue("method", e.getMethod())
-                .addValue("status", e.getStatus());
+            try (var ps = conn.prepareStatement(INSERT)) {
+                ps.setLong(1, id);
+                ps.setLong(2, e.getBookingId());
+                ps.setObject(3, e.getDiscountId());
+                ps.setBigDecimal(4, e.getAmount());
+                ps.setBigDecimal(5, e.getDiscountAmount());
+                ps.setBigDecimal(6, e.getFinalAmount());
+                ps.setDate(7, e.getPaymentDate() != null ? Date.valueOf(e.getPaymentDate()) : null);
+                ps.setString(8, e.getMethod());
+                ps.setString(9, e.getStatus());
+                ps.executeUpdate();
+            }
 
-        jdbcTemplate.update(INSERT, params);
-        return id;
+            return id;
+        } catch (SQLException ex) {
+            throw new RuntimeException(ex);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
     }
 }

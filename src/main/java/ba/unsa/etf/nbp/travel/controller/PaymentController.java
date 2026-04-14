@@ -5,6 +5,7 @@ import ba.unsa.etf.nbp.travel.dto.response.PageResponse;
 import ba.unsa.etf.nbp.travel.dto.response.PaymentResponse;
 import ba.unsa.etf.nbp.travel.security.AuthContext;
 import ba.unsa.etf.nbp.travel.security.Role;
+import ba.unsa.etf.nbp.travel.service.BookingService;
 import ba.unsa.etf.nbp.travel.service.PaymentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ import static org.springframework.http.HttpStatus.CREATED;
 public class PaymentController {
 
     private final PaymentService paymentService;
+    private final BookingService bookingService;
 
     @PostMapping("/bookings/{bookingId}/payment")
     @Role({"USER"})
@@ -32,6 +34,7 @@ public class PaymentController {
                                                    @Valid @RequestBody PaymentRequest request) {
         var userId = AuthContext.get().userId();
         var response = paymentService.create(bookingId, request, userId);
+        bookingService.confirm(bookingId);
         return ResponseEntity.status(CREATED).body(response);
     }
 

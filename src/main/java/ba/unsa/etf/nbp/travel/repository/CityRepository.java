@@ -2,35 +2,30 @@ package ba.unsa.etf.nbp.travel.repository;
 
 import ba.unsa.etf.nbp.travel.model.entity.CityEntity;
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.RowMapper;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Repository;
 
+import javax.sql.DataSource;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 @Repository
 @RequiredArgsConstructor
 public class CityRepository {
 
-    private final NamedParameterJdbcTemplate jdbcTemplate;
-
-    private static final RowMapper<CityEntity> ROW_MAPPER = (rs, rowNum) -> CityEntity.builder()
-            .id(rs.getLong("ID"))
-            .name(rs.getString("NAME"))
-            .countryId(rs.getLong("COUNTRY_ID"))
-            .build();
+    private final DataSource dataSource;
 
     private static final String SELECT_ALL =
             "SELECT * FROM NBP_CITY ORDER BY ID";
 
     private static final String SELECT_BY_ID =
-            "SELECT * FROM NBP_CITY WHERE ID = :id";
+            "SELECT * FROM NBP_CITY WHERE ID = ?";
 
     private static final String SELECT_BY_COUNTRY_ID =
-            "SELECT * FROM NBP_CITY WHERE COUNTRY_ID = :countryId ORDER BY ID";
+            "SELECT * FROM NBP_CITY WHERE COUNTRY_ID = ? ORDER BY ID";
 
     private static final String SELECT_NEXT_ID =
             "SELECT NBP_CITY_SEQ.NEXTVAL FROM DUAL";
@@ -38,54 +33,126 @@ public class CityRepository {
     private static final String INSERT =
             """
             INSERT INTO NBP_CITY (ID, NAME, COUNTRY_ID)
-            VALUES (:id, :name, :countryId)
+            VALUES (?, ?, ?)
             """;
 
     private static final String UPDATE =
             """
             UPDATE NBP_CITY
-            SET NAME = :name, COUNTRY_ID = :countryId
-            WHERE ID = :id
+            SET NAME = ?, COUNTRY_ID = ?
+            WHERE ID = ?
             """;
 
     private static final String DELETE_BY_ID =
-            "DELETE FROM NBP_CITY WHERE ID = :id";
+            "DELETE FROM NBP_CITY WHERE ID = ?";
 
     public List<CityEntity> findAll() {
-        return jdbcTemplate.query(SELECT_ALL, Map.of(), ROW_MAPPER);
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try (var ps = conn.prepareStatement(SELECT_ALL);
+             var rs = ps.executeQuery()) {
+            var results = new ArrayList<CityEntity>();
+            while (rs.next()) {
+                results.add(mapRow(rs));
+            }
+            return results;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
     }
 
     public Optional<CityEntity> findById(Long id) {
-        var results = jdbcTemplate.query(SELECT_BY_ID, Map.of("id", id), ROW_MAPPER);
-        return results.stream().findFirst();
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try (var ps = conn.prepareStatement(SELECT_BY_ID)) {
+            ps.setLong(1, id);
+            try (var rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(mapRow(rs));
+                }
+                return Optional.empty();
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
     }
 
     public List<CityEntity> findByCountryId(Long countryId) {
-        return jdbcTemplate.query(SELECT_BY_COUNTRY_ID, Map.of("countryId", countryId), ROW_MAPPER);
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try (var ps = conn.prepareStatement(SELECT_BY_COUNTRY_ID)) {
+            ps.setLong(1, countryId);
+            try (var rs = ps.executeQuery()) {
+                var results = new ArrayList<CityEntity>();
+                while (rs.next()) {
+                    results.add(mapRow(rs));
+                }
+                return results;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
     }
 
     public Long save(CityEntity entity) {
-        var id = jdbcTemplate.queryForObject(SELECT_NEXT_ID, Map.of(), Long.class);
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try {
+            Long id;
+            try (var seqPs = conn.prepareStatement(SELECT_NEXT_ID);
+                 var rs = seqPs.executeQuery()) {
+                rs.next();
+                id = rs.getLong(1);
+            }
 
-        var params = new MapSqlParameterSource()
-                .addValue("id", id)
-                .addValue("name", entity.getName())
-                .addValue("countryId", entity.getCountryId());
+            try (var ps = conn.prepareStatement(INSERT)) {
+                ps.setLong(1, id);
+                ps.setString(2, entity.getName());
+                ps.setLong(3, entity.getCountryId());
+                ps.executeUpdate();
+            }
 
-        jdbcTemplate.update(INSERT, params);
-        return id;
+            return id;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
     }
 
     public void update(CityEntity entity) {
-        var params = new MapSqlParameterSource()
-                .addValue("id", entity.getId())
-                .addValue("name", entity.getName())
-                .addValue("countryId", entity.getCountryId());
-
-        jdbcTemplate.update(UPDATE, params);
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try (var ps = conn.prepareStatement(UPDATE)) {
+            ps.setString(1, entity.getName());
+            ps.setLong(2, entity.getCountryId());
+            ps.setLong(3, entity.getId());
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
     }
 
     public void deleteById(Long id) {
-        jdbcTemplate.update(DELETE_BY_ID, Map.of("id", id));
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try (var ps = conn.prepareStatement(DELETE_BY_ID)) {
+            ps.setLong(1, id);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
+    }
+
+    private CityEntity mapRow(ResultSet rs) throws SQLException {
+        return CityEntity.builder()
+                .id(rs.getLong("ID"))
+                .name(rs.getString("NAME"))
+                .countryId(rs.getLong("COUNTRY_ID"))
+                .build();
     }
 }

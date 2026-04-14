@@ -21,7 +21,6 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import static ba.unsa.etf.nbp.travel.mapper.PaymentMapper.toResponse;
 import static ba.unsa.etf.nbp.travel.model.enums.BookingStatus.CANCELLED;
-import static ba.unsa.etf.nbp.travel.model.enums.BookingStatus.CONFIRMED;
 import static ba.unsa.etf.nbp.travel.model.enums.PaymentStatus.COMPLETED;
 import static ba.unsa.etf.nbp.travel.util.PaginationUtil.buildPageResponse;
 import static java.util.Objects.nonNull;
@@ -90,8 +89,6 @@ public class PaymentService {
             throw new ConflictException("Discount code already used");
         }
         payment.setId(id);
-
-        bookingRepository.updateStatus(bookingId, CONFIRMED.name());
 
         return toResponse(payment);
     }
