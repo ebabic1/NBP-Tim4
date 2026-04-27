@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: optional:file:.env[.properties]
   datasource:
     url: jdbc:oracle:thin:@ora-02.db.lab.etf.unsa.ba:1521:ETFDB
     username: NBPT4
@@ -11,11 +13,12 @@ spring:
 
   flyway:
     enabled: true
+    validate-on-migrate: false    # <-- ignore checksum mismatches
     schemas: NBPT4
     default-schema: NBPT4
-    baseline-on-migrate: true
     table: nbp_flyway_history
     locations: classpath:db/migration
+    baseline-on-migrate: true
 
 server:
   port: 8080
@@ -24,6 +27,14 @@ app:
   jwt:
     secret: nbp-travel-jwt-secret-key-for-development-only-change-in-production
     expiration-ms: 86400000
+  blob:
+    enabled: ${APP_BLOB_ENABLED:false}
+    provider: SUPABASE_S3
+    endpoint: ${SUPABASE_S3_ENDPOINT:https://eahayxedafzgzbzllqgs.storage.supabase.co/storage/v1/s3}
+    region: ${SUPABASE_S3_REGION:us-east-1}
+    bucket: ${SUPABASE_S3_BUCKET:nbp-documents}
+    access-key-id: ${SUPABASE_S3_ACCESS_KEY_ID:}
+    secret-access-key: ${SUPABASE_S3_SECRET_ACCESS_KEY:}
 
 springdoc:
   api-docs:
