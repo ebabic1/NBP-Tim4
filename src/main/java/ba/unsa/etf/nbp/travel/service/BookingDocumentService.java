@@ -7,8 +7,6 @@ import ba.unsa.etf.nbp.travel.security.AuthContext;
 import ba.unsa.etf.nbp.travel.storage.DocumentStorage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
-import software.amazon.awssdk.services.s3.model.S3Exception;
 
 import java.io.InputStream;
 
@@ -66,16 +64,11 @@ public class BookingDocumentService {
     }
 
     private DocumentStorage.StoredDocument safeDownload(Long bookingId, DocumentType type) {
-        try {
-            return documentStorage.download(blobName(bookingId, type));
-        } catch (NoSuchKeyException e) {
+        var doc = documentStorage.download(blobName(bookingId, type));
+        if (doc == null) {
             throw new ResourceNotFoundException(type.name().toLowerCase() + " document for booking", bookingId);
-        } catch (S3Exception e) {
-            if (e.statusCode() == 404) {
-                throw new ResourceNotFoundException(type.name().toLowerCase() + " document for booking", bookingId);
-            }
-            throw e;
         }
+        return doc;
     }
 
     private void ensureBookingExists(Long bookingId) {
