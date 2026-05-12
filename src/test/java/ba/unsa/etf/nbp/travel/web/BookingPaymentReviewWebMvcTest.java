@@ -168,7 +168,7 @@ class BookingPaymentReviewWebMvcTest {
 
     @Test
     void payment_getById() throws Exception {
-        when(paymentService.findById(11L)).thenReturn(
+        when(paymentService.findById(11L, 100L, "USER")).thenReturn(
                 new PaymentResponse(11L, 9L, null, BigDecimal.ONE, BigDecimal.ZERO,
                         BigDecimal.ONE, LocalDate.now(), "CARD", "PAID"));
 
@@ -179,7 +179,7 @@ class BookingPaymentReviewWebMvcTest {
 
     @Test
     void payment_getByBookingId() throws Exception {
-        when(paymentService.findByBookingId(9L)).thenReturn(
+        when(paymentService.findByBookingId(9L, 100L, "USER")).thenReturn(
                 new PaymentResponse(11L, 9L, null, BigDecimal.ONE, BigDecimal.ZERO,
                         BigDecimal.ONE, LocalDate.now(), "CARD", "PAID"));
 
