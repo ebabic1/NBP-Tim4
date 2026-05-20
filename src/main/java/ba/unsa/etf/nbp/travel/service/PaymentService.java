@@ -12,7 +12,6 @@ import ba.unsa.etf.nbp.travel.repository.BookingRepository;
 import ba.unsa.etf.nbp.travel.repository.DiscountRepository;
 import ba.unsa.etf.nbp.travel.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -86,8 +85,11 @@ public class PaymentService {
         Long id;
         try {
             id = paymentRepository.save(payment);
-        } catch (DataIntegrityViolationException e) {
-            throw new ConflictException("Discount code already used");
+        } catch (Exception e) {
+            if (isConstraintViolation(e)) {
+                throw new ConflictException("Discount code already used");
+            }
+            throw new RuntimeException(e);
         }
         payment.setId(id);
 
@@ -108,6 +110,17 @@ public class PaymentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Payment for booking", bookingId));
         checkOwnership(bookingId, currentUserId, currentRole);
         return toResponse(entity);
+    }
+
+    private boolean isConstraintViolation(Throwable e) {
+        var cause = e;
+        while (nonNull(cause)) {
+            if (cause instanceof java.sql.SQLIntegrityConstraintViolationException) {
+                return true;
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 
     private void checkOwnership(Long bookingId, Long currentUserId, String currentRole) {

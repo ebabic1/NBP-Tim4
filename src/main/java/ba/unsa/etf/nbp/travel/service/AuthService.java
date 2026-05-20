@@ -20,6 +20,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final JwtProvider jwtProvider;
+    private final UserActivityService userActivityService;
 
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByUsername(request.username())) {
@@ -66,6 +67,8 @@ public class AuthService {
                 .orElseThrow(() -> new UnauthorizedException("User role not found"));
 
         var token = jwtProvider.generateToken(user.getId(), user.getUsername(), role.getName());
+
+        userActivityService.logActivity(user.getId(), user.getUsername(), "logged in");
 
         return new AuthResponse(token, user.getId(), user.getUsername(), user.getEmail(), role.getName());
     }

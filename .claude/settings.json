@@ -1,0 +1,11 @@
+{
+  "enabledPlugins": {},
+  "extraKnownMarketplaces": {
+    "everything-claude-code": {
+      "source": {
+        "source": "github",
+        "repo": "aaione/everything-claude-code-zh"
+      }
+    }
+  }
+}
