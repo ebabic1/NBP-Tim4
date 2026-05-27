@@ -52,7 +52,7 @@ public class BookingService {
         var totalPrice = calculateTotalPrice(type, request);
 
         var entity = toEntity(request, userId, totalPrice);
-        var id = bookingRepository.save(entity);
+        var id = bookingRepository.createWithPackage(entity);
 
         entity.setId(id);
         var saved = bookingRepository.findById(id)
@@ -99,7 +99,7 @@ public class BookingService {
             throw new BadRequestException("Cannot confirm booking with non-completed payment");
         }
 
-        bookingRepository.updateStatus(id, CONFIRMED.name());
+        bookingRepository.confirmWithPackage(id);
 
         entity.setStatus(CONFIRMED.name());
         return toResponse(entity);
@@ -118,7 +118,7 @@ public class BookingService {
             throw new BadRequestException("Booking is already cancelled");
         }
 
-        bookingRepository.updateStatus(id, CANCELLED.name());
+        bookingRepository.cancelWithPackage(id);
 
         entity.setStatus(CANCELLED.name());
         return toResponse(entity);

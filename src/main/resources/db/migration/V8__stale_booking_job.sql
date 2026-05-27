@@ -38,17 +38,6 @@ BEGIN
 END;
 /
 
-BEGIN
-    DBMS_SCHEDULER.DROP_JOB(
-        job_name => 'NBP_STALE_BOOKINGS_JOB',
-        force    => TRUE
-    );
-EXCEPTION
-    WHEN OTHERS THEN
-        IF SQLCODE NOT IN (-27475, -27486) THEN
-            RAISE;
-        END IF;
-END;
 /
 
 BEGIN

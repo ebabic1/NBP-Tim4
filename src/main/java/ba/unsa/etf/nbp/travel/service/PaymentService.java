@@ -7,7 +7,6 @@ import ba.unsa.etf.nbp.travel.exception.BadRequestException;
 import ba.unsa.etf.nbp.travel.exception.ConflictException;
 import ba.unsa.etf.nbp.travel.exception.ForbiddenException;
 import ba.unsa.etf.nbp.travel.exception.ResourceNotFoundException;
-import ba.unsa.etf.nbp.travel.model.entity.PaymentEntity;
 import ba.unsa.etf.nbp.travel.repository.BookingRepository;
 import ba.unsa.etf.nbp.travel.repository.DiscountRepository;
 import ba.unsa.etf.nbp.travel.repository.PaymentRepository;
@@ -16,13 +15,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import static ba.unsa.etf.nbp.travel.mapper.PaymentMapper.toResponse;
 import static ba.unsa.etf.nbp.travel.model.enums.BookingStatus.CANCELLED;
-import static ba.unsa.etf.nbp.travel.model.enums.BookingStatus.CONFIRMED;
-import static ba.unsa.etf.nbp.travel.model.enums.PaymentStatus.COMPLETED;
 import static ba.unsa.etf.nbp.travel.util.PaginationUtil.buildPageResponse;
 import static java.util.Objects.nonNull;
 
@@ -51,8 +46,6 @@ public class PaymentService {
             throw new BadRequestException("Cannot pay for a cancelled booking");
         }
 
-        var amount = booking.getTotalPrice();
-        var discountAmount = BigDecimal.ZERO;
         Long discountId = null;
 
         if (nonNull(request.discountCode()) && !request.discountCode().isBlank()) {
@@ -64,35 +57,19 @@ public class PaymentService {
                 throw new BadRequestException("Discount code expired");
             }
 
-            discountAmount = amount.multiply(discount.getPercentage())
-                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
             discountId = discount.getId();
         }
 
-        var finalAmount = amount.subtract(discountAmount);
-
-        var payment = PaymentEntity.builder()
-                .id(null)
-                .bookingId(bookingId)
-                .discountId(discountId)
-                .amount(amount)
-                .discountAmount(discountAmount)
-                .finalAmount(finalAmount)
-                .paymentDate(LocalDate.now())
-                .method(request.method())
-                .status(COMPLETED.name())
-                .build();
-
         Long id;
         try {
-            id = paymentRepository.save(payment);
+            id = paymentRepository.createWithPackage(bookingId, request.method(), discountId);
+            paymentRepository.completeWithPackage(id);
         } catch (DataIntegrityViolationException e) {
             throw new ConflictException("Discount code already used");
         }
-        payment.setId(id);
 
-        bookingRepository.updateStatus(bookingId, CONFIRMED.name());
-
+        var payment = paymentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Payment", id));
         return toResponse(payment);
     }
 
