@@ -2,12 +2,16 @@ package ba.unsa.etf.nbp.travel.controller;
 
 import ba.unsa.etf.nbp.travel.dto.request.BookingRequest;
 import ba.unsa.etf.nbp.travel.dto.response.BookingResponse;
+import ba.unsa.etf.nbp.travel.dto.response.ImportResult;
 import ba.unsa.etf.nbp.travel.dto.response.PageResponse;
 import ba.unsa.etf.nbp.travel.security.AuthContext;
 import ba.unsa.etf.nbp.travel.security.Role;
 import ba.unsa.etf.nbp.travel.service.BookingService;
+import ba.unsa.etf.nbp.travel.service.XmlExportService;
+import ba.unsa.etf.nbp.travel.service.XmlImportService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,6 +30,8 @@ import static org.springframework.http.HttpStatus.CREATED;
 public class BookingController {
 
     private final BookingService bookingService;
+    private final XmlExportService xmlExportService;
+    private final XmlImportService xmlImportService;
 
     @PostMapping
     @Role({"USER"})
@@ -67,5 +73,21 @@ public class BookingController {
     public ResponseEntity<BookingResponse> cancel(@PathVariable Long id) {
         var userId = AuthContext.get().userId();
         return ResponseEntity.ok(bookingService.cancel(id, userId));
+    }
+
+    @GetMapping("/export/xml")
+    @Role({"ADMIN"})
+    public ResponseEntity<String> exportXml() {
+        var xml = xmlExportService.exportAllBookings();
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_XML)
+                .body(xml);
+    }
+
+    @PostMapping(value = "/import/xml", consumes = MediaType.APPLICATION_XML_VALUE)
+    @Role({"ADMIN"})
+    public ResponseEntity<ImportResult> importXml(@RequestBody String xml) {
+        var result = xmlImportService.importXml(xml);
+        return ResponseEntity.ok(result);
     }
 }

@@ -6,10 +6,12 @@ import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Repository;
 
 import javax.sql.DataSource;
-import java.sql.Types;
+import ba.unsa.etf.nbp.travel.dto.response.ImportResult;
+
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -66,6 +68,12 @@ public class BookingRepository {
 
     private static final String COUNT_CONFIRMED_BY_TRANSPORT_ID =
             "SELECT COUNT(*) FROM NBP_BOOKING WHERE TRANSPORT_ID = ? AND STATUS != 'CANCELLED'";
+
+    private static final String SELECT_ALL =
+            "SELECT * FROM NBP_BOOKING ORDER BY ID";
+
+    private static final String CALL_IMPORT_BOOKINGS_XML =
+            "{ call NBP_BOOKING_PKG.IMPORT_BOOKINGS_XML(?, ?, ?) }";
 
     private BookingEntity mapRow(ResultSet rs) throws SQLException {
         return BookingEntity.builder()
@@ -246,6 +254,39 @@ public class BookingRepository {
                 return rs.getLong(1);
             }
             return 0L;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
+    }
+
+    public List<BookingEntity> findAll() {
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try (var ps = conn.prepareStatement(SELECT_ALL);
+             var rs = ps.executeQuery()) {
+            var list = new ArrayList<BookingEntity>();
+            while (rs.next()) {
+                list.add(mapRow(rs));
+            }
+            return list;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
+    }
+
+    public ImportResult importBookingsXml(String xml) {
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try (var cs = conn.prepareCall(CALL_IMPORT_BOOKINGS_XML)) {
+            var clob = conn.createClob();
+            clob.setString(1, xml);
+            cs.setClob(1, clob);
+            cs.registerOutParameter(2, Types.NUMERIC);
+            cs.registerOutParameter(3, Types.NUMERIC);
+            cs.execute();
+            return new ImportResult(cs.getLong(2), cs.getLong(3));
         } catch (SQLException e) {
             throw new RuntimeException(e);
         } finally {

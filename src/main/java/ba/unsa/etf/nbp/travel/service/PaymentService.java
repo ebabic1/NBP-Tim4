@@ -63,8 +63,11 @@ public class PaymentService {
         try {
             id = paymentRepository.createWithPackage(bookingId, request.method(), discountId);
             paymentRepository.completeWithPackage(id);
-        } catch (DataIntegrityViolationException e) {
-            throw new ConflictException("Discount code already used");
+        } catch (Exception e) {
+            if (isConstraintViolation(e)) {
+                throw new ConflictException("Discount code already used");
+            }
+            throw new RuntimeException(e);
         }
 
         var payment = paymentRepository.findById(id)
