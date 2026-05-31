@@ -2,6 +2,7 @@ package ba.unsa.etf.nbp.travel.repository;
 
 import ba.unsa.etf.nbp.travel.model.entity.PaymentEntity;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Repository;
 
@@ -9,6 +10,7 @@ import javax.sql.DataSource;
 import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -59,6 +61,12 @@ public class PaymentRepository {
             VALUES (?, ?, ?, ?, ?, ?,
                 ?, ?, ?)
             """;
+
+    private static final String CALL_CREATE_PAYMENT =
+            "{ call NBP_PAYMENT_PKG.CREATE_PAYMENT(?, ?, ?, ?) }";
+
+    private static final String CALL_COMPLETE_PAYMENT =
+            "{ call NBP_PAYMENT_PKG.COMPLETE_PAYMENT(?) }";
 
     private PaymentEntity mapRow(ResultSet rs) throws SQLException {
         return PaymentEntity.builder()
@@ -205,6 +213,37 @@ public class PaymentRepository {
             }
 
             return id;
+        } catch (SQLException ex) {
+            throw new RuntimeException(ex);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
+    }
+
+    public Long createWithPackage(Long bookingId, String method, Long discountId) {
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try (var cs = conn.prepareCall(CALL_CREATE_PAYMENT)) {
+            cs.setLong(1, bookingId);
+            cs.setString(2, method);
+            cs.setObject(3, discountId);
+            cs.registerOutParameter(4, Types.NUMERIC);
+            cs.execute();
+            return cs.getLong(4);
+        } catch (SQLException ex) {
+            if (ex.getErrorCode() == 1) {
+                throw new DataIntegrityViolationException("Unique constraint violation while creating payment", ex);
+            }
+            throw new RuntimeException(ex);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
+    }
+
+    public void completeWithPackage(Long paymentId) {
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try (var cs = conn.prepareCall(CALL_COMPLETE_PAYMENT)) {
+            cs.setLong(1, paymentId);
+            cs.execute();
         } catch (SQLException ex) {
             throw new RuntimeException(ex);
         } finally {

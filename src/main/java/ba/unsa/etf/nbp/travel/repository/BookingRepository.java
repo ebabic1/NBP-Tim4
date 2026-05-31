@@ -6,6 +6,7 @@ import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Repository;
 
 import javax.sql.DataSource;
+import java.sql.Types;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -35,6 +36,15 @@ public class BookingRepository {
 
     private static final String UPDATE_STATUS =
             "UPDATE NBP_BOOKING SET STATUS = ? WHERE ID = ?";
+
+    private static final String CALL_CREATE_BOOKING =
+            "{ call NBP_BOOKING_PKG.CREATE_BOOKING(?, ?, ?, ?, ?, ?, ?) }";
+
+    private static final String CALL_CONFIRM_BOOKING =
+            "{ call NBP_BOOKING_PKG.CONFIRM_BOOKING(?) }";
+
+    private static final String CALL_CANCEL_BOOKING =
+            "{ call NBP_BOOKING_PKG.CANCEL_BOOKING(?) }";
 
     private static final String SELECT_BY_USER_ID_PAGED =
             "SELECT * FROM NBP_BOOKING WHERE USER_ID = ? ORDER BY ID OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
@@ -113,6 +123,45 @@ public class BookingRepository {
             return id;
         } catch (SQLException ex) {
             throw new RuntimeException(ex);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
+    }
+
+    public Long createWithPackage(BookingEntity e) {
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try (var cs = conn.prepareCall(CALL_CREATE_BOOKING)) {
+            cs.setLong(1, e.getUserId());
+            cs.setString(2, e.getBookingType());
+            cs.setBigDecimal(3, e.getTotalPrice());
+            cs.setObject(4, e.getTravelPackageId());
+            cs.setObject(5, e.getAccommodationId());
+            cs.setObject(6, e.getTransportId());
+            cs.registerOutParameter(7, Types.NUMERIC);
+            cs.execute();
+            return cs.getLong(7);
+        } catch (SQLException ex) {
+            throw new RuntimeException(ex);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+        }
+    }
+
+    public void confirmWithPackage(Long id) {
+        callStatusProcedure(CALL_CONFIRM_BOOKING, id);
+    }
+
+    public void cancelWithPackage(Long id) {
+        callStatusProcedure(CALL_CANCEL_BOOKING, id);
+    }
+
+    private void callStatusProcedure(String sql, Long id) {
+        var conn = DataSourceUtils.getConnection(dataSource);
+        try (var cs = conn.prepareCall(sql)) {
+            cs.setLong(1, id);
+            cs.execute();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         } finally {
             DataSourceUtils.releaseConnection(conn, dataSource);
         }
